@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEOPORTAL SE-T3</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <button id="sidebarToggle" class="icon-btn" title="Mostrar/ocultar painel">&#9776;</button>
+  <div class="brand">
+    <span class="brand-title">GEOPORTAL SE-T3</span>
+    <span class="brand-sub">Ortomosaico &amp; Vegetação Classificada — Faixa de Servidão</span>
+  </div>
+  <div class="topbar-actions">
+    <button id="btnHome" class="icon-btn" title="Zoom para a área">&#8962;</button>
+    <button id="btnFullscreen" class="icon-btn" title="Tela cheia">&#9974;</button>
+  </div>
+</header>
+
+<div id="app">
+  <aside id="sidebar">
+
+    <section class="panel">
+      <h3>Mapa Base</h3>
+      <div class="radio-row"><label><input type="radio" name="basemap" value="ortho" checked> Ortofoto Local (offline)</label></div>
+      <div class="radio-row"><label><input type="radio" name="basemap" value="esri"> Satélite (Esri)</label></div>
+      <div class="radio-row"><label><input type="radio" name="basemap" value="osm"> OpenStreetMap</label></div>
+      <div class="radio-row"><label><input type="radio" name="basemap" value="none"> Nenhum (fundo escuro)</label></div>
+
+      <div class="slider-row">
+        <label for="orthoOpacity">Opacidade da ortofoto</label>
+        <input type="range" id="orthoOpacity" min="0" max="100" value="100">
+        <span id="orthoOpacityVal" class="slider-val">100%</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header-row">
+        <h3>Vegetação Classificada</h3>
+        <button id="btnResetColors" class="link-btn">restaurar cores</button>
+      </div>
+      <div id="layerList"></div>
+      <div class="panel-footer" id="vegSummary">Carregando...</div>
+    </section>
+
+    <section class="panel panel-meta">
+      <div><strong>CRS de origem:</strong> EPSG:32724 (UTM 24S)</div>
+      <div><strong>Publicado em:</strong> EPSG:4326 / EPSG:3857</div>
+      <div id="loadStatus">Carregando dados...</div>
+    </section>
+
+  </aside>
+
+  <main id="mapWrap">
+    <div id="map"></div>
+    <div id="coordReadout" class="map-overlay-box">lat, lon</div>
+  </main>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
