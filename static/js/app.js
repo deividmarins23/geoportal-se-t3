@@ -38,9 +38,13 @@
     attribution: "Ortofoto local — SE-T3"
   });
 
+  // Em áreas rurais o Esri World Imagery costuma não ter imagem em zooms muito
+  // altos e devolve um tile placeholder ("Map data not yet available") em vez
+  // de erro. maxNativeZoom trava as requisições nesse teto e deixa o Leaflet
+  // ampliar (com perda de nitidez, mas sem placeholder) a partir dali.
   var esriLayer = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    { maxZoom: 22, attribution: "Tiles &copy; Esri" }
+    { maxZoom: 22, maxNativeZoom: 17, attribution: "Tiles &copy; Esri" }
   );
 
   var osmLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
