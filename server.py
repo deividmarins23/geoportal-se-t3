@@ -10,6 +10,7 @@ Uso:
     python server.py [porta]
 """
 import http.server
+import mimetypes
 import os
 import socket
 import sys
@@ -18,6 +19,10 @@ import webbrowser
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PORT = 8765
+
+# Python < 3.11 nao conhece .webp por padrao e serviria como
+# application/octet-stream; forcamos o tipo correto pros tiles.
+mimetypes.add_type("image/webp", ".webp")
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -29,7 +34,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # cache leve para tiles/geojson locais, sem cache para o html/js (facilita depuracao)
-        if self.path.endswith((".png", ".jpg")):
+        if self.path.endswith((".png", ".jpg", ".webp")):
             self.send_header("Cache-Control", "public, max-age=86400")
         else:
             self.send_header("Cache-Control", "no-cache")

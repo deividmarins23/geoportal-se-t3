@@ -205,6 +205,124 @@ html, body {
   pointer-events: none;
 }
 
+.project-card {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--primary-light);
+  padding: 9px 10px;
+  margin-bottom: 10px;
+}
+.project-card:last-child { margin-bottom: 0; }
+
+.project-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.project-card-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.project-card select {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 5px;
+  background: #fff;
+  color: var(--text);
+  max-width: 140px;
+}
+
+.project-card .layer-card { background: #fff; }
+
+.project-summary {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.swipe-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  margin-bottom: 8px;
+}
+.swipe-row label { color: var(--text-muted); flex: none; }
+.swipe-row select {
+  flex: 1;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 6px;
+  background: #fff;
+  color: var(--text);
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary.active { background: #b91c1c; }
+.btn-primary.active:hover { background: #991b1b; }
+
+/* Ferramenta de swipe entre duas ortofotos */
+.swipe-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+  z-index: 650;
+  cursor: ew-resize;
+}
+.swipe-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.3);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--primary-dark);
+  cursor: ew-resize;
+  user-select: none;
+}
+.swipe-label {
+  position: absolute;
+  top: 8px;
+  background: rgba(15, 23, 33, 0.78);
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  z-index: 650;
+  pointer-events: none;
+}
+.swipe-label.left { left: 8px; }
+.swipe-label.right { right: 8px; }
+
 /* Leaflet control tweaks for a more polished look */
 .leaflet-control-layers,
 .leaflet-bar {

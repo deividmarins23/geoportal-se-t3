@@ -1,0 +1,50 @@
+{
+  "project": "se-t3",
+  "projectName": "SE-T3",
+  "date": "2026-08-03",
+  "bounds": [
+    [
+      -3.7922032250649997,
+      -38.93378227704
+    ],
+    [
+      -3.785848226856,
+      -38.926831922559
+    ]
+  ],
+  "tileExt": "webp",
+  "minNativeZoom": 15,
+  "maxNativeZoom": 21,
+  "classes": [
+    {
+      "id": 1,
+      "name": "Solo",
+      "count": 95,
+      "areaM2": 9264.27
+    },
+    {
+      "id": 2,
+      "name": "Roço (até 0,40 m)",
+      "count": 512,
+      "areaM2": 2615.19
+    },
+    {
+      "id": 3,
+      "name": "Poda Leve (0,40 m a 3,00 m)",
+      "count": 313,
+      "areaM2": 5067.55
+    },
+    {
+      "id": 4,
+      "name": "Poda Seletiva (3,00 m a 8,00 m)",
+      "count": 48,
+      "areaM2": 345.85
+    },
+    {
+      "id": 6,
+      "name": "Não Identificado",
+      "count": 418,
+      "areaM2": 1426.76
+    }
+  ]
+}

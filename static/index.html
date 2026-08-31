@@ -26,31 +26,36 @@
 
     <section class="panel">
       <h3>Mapa Base</h3>
-      <div class="radio-row"><label><input type="radio" name="basemap" value="ortho" checked> Ortofoto Local (offline)</label></div>
-      <div class="radio-row"><label><input type="radio" name="basemap" value="esri"> Satélite (Esri)</label></div>
+      <div class="radio-row"><label><input type="radio" name="basemap" value="esri" checked> Satélite (Esri)</label></div>
       <div class="radio-row"><label><input type="radio" name="basemap" value="osm"> OpenStreetMap</label></div>
       <div class="radio-row"><label><input type="radio" name="basemap" value="none"> Nenhum (fundo escuro)</label></div>
-
-      <div class="slider-row">
-        <label for="orthoOpacity">Opacidade da ortofoto</label>
-        <input type="range" id="orthoOpacity" min="0" max="100" value="100">
-        <span id="orthoOpacityVal" class="slider-val">100%</span>
-      </div>
     </section>
 
     <section class="panel">
       <div class="panel-header-row">
-        <h3>Vegetação Classificada</h3>
+        <h3>Projetos</h3>
         <button id="btnResetColors" class="link-btn">restaurar cores</button>
       </div>
-      <div id="layerList"></div>
-      <div class="panel-footer" id="vegSummary">Carregando...</div>
+      <div id="projectList"></div>
+      <div class="panel-footer" id="catalogStatus">Carregando catálogo...</div>
+    </section>
+
+    <section class="panel">
+      <h3>Comparar Ortofotos (Swipe)</h3>
+      <div class="swipe-row">
+        <label for="swipeA">Camada A</label>
+        <select id="swipeA"></select>
+      </div>
+      <div class="swipe-row">
+        <label for="swipeB">Camada B</label>
+        <select id="swipeB"></select>
+      </div>
+      <button id="btnSwipeToggle" class="btn-primary">Ativar comparação</button>
     </section>
 
     <section class="panel panel-meta">
       <div><strong>CRS de origem:</strong> EPSG:32724 (UTM 24S)</div>
       <div><strong>Publicado em:</strong> EPSG:4326 / EPSG:3857</div>
-      <div id="loadStatus">Carregando dados...</div>
     </section>
 
   </aside>
