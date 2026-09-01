@@ -257,7 +257,11 @@
           {
             minZoom: 3, maxZoom: 22,
             maxNativeZoom: fl.maxNativeZoom, minNativeZoom: fl.minNativeZoom,
-            bounds: fl.bounds, attribution: "Ortofoto local — " + projects[pid].name
+            bounds: fl.bounds, attribution: "Ortofoto local — " + projects[pid].name,
+            // evita o "fantasma" de tile esticado via CSS que fica colado na
+            // tela quando o zoom para em areas com muitos tiles (ex: usinas
+            // solares) -- espera os tiles reais em vez de mostrar preview
+            updateWhenZooming: false, updateWhenIdle: true
           }
         );
       }
@@ -495,10 +499,12 @@
     var b = flightFromSelectValue(swipeSelectB.value);
 
     swipeLayers.a = L.tileLayer("../data/" + a.meta.tiles + "/{z}/{x}/{y}." + a.meta.tileExt, {
-      maxZoom: 22, maxNativeZoom: a.meta.maxNativeZoom, minNativeZoom: a.meta.minNativeZoom, bounds: a.meta.bounds
+      maxZoom: 22, maxNativeZoom: a.meta.maxNativeZoom, minNativeZoom: a.meta.minNativeZoom, bounds: a.meta.bounds,
+      updateWhenZooming: false, updateWhenIdle: true
     }).addTo(map);
     swipeLayers.b = L.tileLayer("../data/" + b.meta.tiles + "/{z}/{x}/{y}." + b.meta.tileExt, {
-      maxZoom: 22, maxNativeZoom: b.meta.maxNativeZoom, minNativeZoom: b.meta.minNativeZoom, bounds: b.meta.bounds
+      maxZoom: 22, maxNativeZoom: b.meta.maxNativeZoom, minNativeZoom: b.meta.minNativeZoom, bounds: b.meta.bounds,
+      updateWhenZooming: false, updateWhenIdle: true
     }).addTo(map);
 
     var mapWrap = document.getElementById("mapWrap");
