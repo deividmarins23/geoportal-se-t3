@@ -26,6 +26,7 @@ Para adicionar varios projetos/blocos de forma guiada, sem decorar esses
 parametros, use o assistente interativo: ingest_wizard.py (ou ADICIONAR_DADOS.bat).
 """
 import argparse
+import datetime
 import glob
 import json
 import math
@@ -506,7 +507,10 @@ def rebuild_catalog():
         p["flights"].sort(key=lambda fl: (fl["date"], fl["block"] or ""), reverse=True)
         project_list.append(p)
 
-    catalog = {"projects": project_list}
+    catalog = {
+        "generatedAt": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "projects": project_list,
+    }
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(CATALOG_PATH, "w", encoding="utf-8") as f:
         json.dump(catalog, f, indent=2, ensure_ascii=False)

@@ -121,6 +121,8 @@
       return r.json();
     })
     .then(function (catalog) {
+      var updatedEl = document.getElementById("dataUpdatedAt");
+      if (updatedEl) { updatedEl.textContent = catalog.generatedAt || "—"; }
       var cat = catalog.projects || [];
       if (cat.length === 0) {
         catalogStatus.textContent = "Nenhum projeto no catálogo.";
@@ -512,6 +514,7 @@
   var swipeSelectB = document.getElementById("swipeB");
   var btnSwipeToggle = document.getElementById("btnSwipeToggle");
   var swipeActive = false;
+  var swipeCurrentPct = 50;
   var swipeLayers = { a: null, b: null };
   var swipeDom = { divider: null, handle: null, labelA: null, labelB: null };
 
@@ -566,6 +569,15 @@
       swipeLayers.b._container.style.height = mapSize.y + "px";
     }
 
+    // O Leaflet desloca o pane inteiro (translate3d) conforme o mapa e'
+    // arrastado/zoomado -- a origem local do container nao fica sempre
+    // alinhada com a borda esquerda visivel do mapa. Reaplicamos o corte
+    // sempre que o mapa se move/zooma, e sempre medindo a posicao REAL na
+    // tela (getBoundingClientRect) em vez de assumir que a origem do
+    // container coincide com a do mapa -- e' isso que causava o corte
+    // "grudado" no lugar antigo e desalinhado do divisor.
+    map.on("move zoom", onMapMoveDuringSwipe);
+
     var mapWrap = document.getElementById("mapWrap");
     swipeDom.divider = document.createElement("div");
     swipeDom.divider.className = "swipe-divider";
@@ -595,6 +607,7 @@
   }
 
   function deactivateSwipe() {
+    map.off("move zoom", onMapMoveDuringSwipe);
     if (swipeLayers.a) { map.removeLayer(swipeLayers.a); swipeLayers.a = null; }
     if (swipeLayers.b) { map.removeLayer(swipeLayers.b); swipeLayers.b = null; }
     ["divider", "labelA", "labelB"].forEach(function (k) {
@@ -602,12 +615,16 @@
       swipeDom[k] = null;
     });
     swipeActive = false;
+    swipeCurrentPct = 50;
     btnSwipeToggle.textContent = "Ativar comparação";
     btnSwipeToggle.classList.remove("active");
   }
 
+  function onMapMoveDuringSwipe() { setSwipePosition(swipeCurrentPct); }
+
   function setSwipePosition(pct) {
     pct = Math.max(0, Math.min(100, pct));
+    swipeCurrentPct = pct;
     swipeDom.divider.style.left = pct + "%";
     if (swipeLayers.b) {
       // L.TileLayer nao expoe um getContainer() publico (isso e do L.Map); o
@@ -617,12 +634,23 @@
       // relativo a uma caixa de 0x0 e nao corta nada visualmente. Por isso
       // calculamos o corte em pixels absolutos a partir da largura real do
       // mapa em vez de usar porcentagem.
+      //
+      // Alem disso, o Leaflet pode deslocar o pane do container via
+      // transform (pan/zoom) sem que a origem local dele fique alinhada com
+      // a borda visivel do mapa -- por isso medimos a posicao REAL na tela
+      // de ambos (mapa e container) com getBoundingClientRect() e calculamos
+      // o corte relativo a essa diferenca, em vez de assumir que os dois
+      // comecam no mesmo (0,0).
       var container = swipeLayers.b._container;
       if (container) {
         var mapSize = map.getSize();
         container.style.width = mapSize.x + "px";
         container.style.height = mapSize.y + "px";
-        var xPx = Math.round(mapSize.x * pct / 100);
+
+        var mapRect = document.getElementById("map").getBoundingClientRect();
+        var containerRect = container.getBoundingClientRect();
+        var dividerScreenX = mapRect.left + (mapRect.width * pct / 100);
+        var xPx = Math.round(dividerScreenX - containerRect.left);
         container.style.clipPath = "inset(0px 0px 0px " + xPx + "px)";
       }
     }
