@@ -15,17 +15,21 @@ automaticamente em `http://localhost:8765/static/index.html`.
 Ortofoto e vegetação funcionam offline — só as camadas de mapa base "Satélite (Esri)" e
 "OpenStreetMap" precisam de internet.
 
-## Como adicionar dados (jeito fácil — assistente guiado)
+## Como adicionar dados (jeito fácil — interface gráfica)
 
-Duplo-clique em `RUN_ADICIONAR_DADOS.bat`. Ele mostra o que já está carregado, pergunta
-quantos itens novos você quer processar agora e, pra cada um, pede: nome do projeto, bloco
-(opcional — deixe em branco se o projeto não tiver subcampos), data do voo, e os arquivos de
-origem (geojson de vegetação e/ou ortofoto — pode ter só um dos dois). No fim ele reconstrói o
-catálogo e pergunta se quer publicar (`git add`/`commit`/`push`) na hora.
+Duplo-clique em `GEOPORTAL_GERENCIADOR.bat`. Abre uma janela (sem terminal) com:
+- uma lista do que já está carregado (projeto, bloco, data, se tem ortofoto/vegetação);
+- um formulário pra adicionar um item novo: nome do projeto (escolhe um já existente na lista
+  ou digita um novo), bloco/subcampo (opcional), data do voo, e botões "Procurar..." pra
+  selecionar os arquivos (geojson de vegetação e/ou ortofoto — pode ter só um dos dois, sem
+  precisar digitar caminho nenhum);
+- uma caixa de "Andamento" mostrando o progresso em tempo real;
+- um botão "Publicar agora" (ou a opção de publicar automaticamente depois de cada item).
 
-**Importante pro caso de projetos com muitos blocos** (ex: usina solar com 20 subcampos): rodar
-o assistente apontando só pro subcampo novo **não mexe** nos subcampos já carregados antes —
-cada um vive na sua própria pasta e só é reprocessado se você apontar pra ele de novo.
+Pensada pra quem não mexe com linha de comando. **Importante pro caso de projetos com muitos
+blocos** (ex: usina solar com 20 subcampos): processar um subcampo novo **não mexe** nos que já
+estavam carregados — cada um vive na sua própria pasta e só é reprocessado se você apontar pra
+ele de novo.
 
 ## Como adicionar dados (linha de comando, pra automatizar)
 
@@ -91,13 +95,13 @@ navegador pro resto da sessão — desligar e religar não refaz o download.
 
 ```
 geoportal/
-  build_data.py            pré-processamento por item (projeto+data[+bloco])
-  ingest_wizard.py          assistente interativo (chamado pelo .bat abaixo)
-  server.py                 servidor local estático
-  RUN_GEOPORTAL.bat         abre o site localmente
-  RUN_ADICIONAR_DADOS.bat   assistente pra carregar novos projetos/blocos/voos
-  data/                     gerado por build_data.py (não editar à mão)
+  build_data.py               pré-processamento por item (projeto+data[+bloco])
+  geoportal_ui.py              interface gráfica (chamada pelo .bat abaixo)
+  server.py                    servidor local estático
+  RUN_GEOPORTAL.bat            abre o site localmente
+  GEOPORTAL_GERENCIADOR.bat    interface gráfica pra carregar novos projetos/blocos/voos
+  data/                        gerado por build_data.py (não editar à mão)
     catalog.json
     <projeto>/<data ou data--bloco>/{meta.json, vegetacao_4326.geojson, tiles/}
-  static/                   frontend (Leaflet + HTML/CSS/JS)
+  static/                      frontend (Leaflet + HTML/CSS/JS)
 ```
