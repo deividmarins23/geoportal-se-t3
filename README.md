@@ -85,8 +85,10 @@ O frontend (`static/js/app.js`) lê `data/catalog.json` e monta:
 - Uma **legenda de vegetação global** (cor + opacidade por classe), compartilhada por todos os
   projetos/blocos ativos ao mesmo tempo — ligar/desligar ou recolorir uma classe afeta todo
   mundo que estiver mostrando aquela classe no momento.
-- A ferramenta "Comparar Ortofotos" (swipe) compara duas ortofotos quaisquer do catálogo (de
-  projetos, blocos e/ou datas diferentes) lado a lado com uma barra deslizante.
+- A ferramenta "Comparar Camadas" (swipe) compara duas camadas quaisquer do catálogo lado a
+  lado com uma barra deslizante — ortofoto ou vegetação, de projetos/blocos/datas diferentes,
+  em qualquer combinação (ex: ortofoto vs. ortofoto, vegetação vs. vegetação, ou até ortofoto
+  vs. vegetação).
 
 Tiles e GeoJSON só são buscados na primeira vez que algo é ligado (lazy) e ficam em cache no
 navegador pro resto da sessão — desligar e religar não refaz o download.

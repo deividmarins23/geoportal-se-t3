@@ -30,8 +30,15 @@
   // desenham por cima das camadas normais dos projetos, nao importa a ordem
   // em que foram ligadas -- sem isso, uma camada de projeto ligada depois do
   // swipe podia cobrir tudo e a comparacao parecia "nao fazer nada".
-  map.createPane("swipePane");
-  map.getPane("swipePane").style.zIndex = 650;
+  // Dois panes: A embaixo (nunca recortado), B em cima (recortado pelo
+  // divisor). Cortar o PANE em si (em vez do container interno de cada
+  // camada) funciona igual pra ortofoto (raster) e vegetacao (vetor/SVG) --
+  // qualquer camada que for adicionada aqui no futuro tambem funciona sem
+  // precisar de tratamento especial por tipo.
+  map.createPane("swipePaneA");
+  map.createPane("swipePaneB");
+  map.getPane("swipePaneA").style.zIndex = 649;
+  map.getPane("swipePaneB").style.zIndex = 650;
 
   // Em areas rurais o Esri World Imagery costuma nao ter imagem em zooms muito
   // altos e devolve um tile placeholder ("Map data not yet available") em vez
@@ -508,23 +515,24 @@
   }
 
   // ------------------------------------------------------------------
-  // Comparar Ortofotos (swipe)
+  // Comparar Camadas (swipe) -- ortofoto ou vegetacao, qualquer combinacao
   // ------------------------------------------------------------------
   var swipeSelectA = document.getElementById("swipeA");
   var swipeSelectB = document.getElementById("swipeB");
   var btnSwipeToggle = document.getElementById("btnSwipeToggle");
   var swipeActive = false;
   var swipeCurrentPct = 50;
-  var swipeLayers = { a: null, b: null };
+  var swipeLayers = { a: null, b: null }; // cada lado e' um array de layers (1 se ortofoto, N se vegetacao)
   var swipeDom = { divider: null, handle: null, labelA: null, labelB: null };
 
   function populateSwipeSelects() {
     var opts = [];
     projectOrder.forEach(function (pid) {
       projects[pid].flights.forEach(function (fl) {
-        if (!fl.hasOrtho) { return; }
+        var base = pid + "|" + fl.date + "|" + (fl.block || "");
         var label = projects[pid].name + (fl.block ? " / " + fl.block : "") + " — " + fmtDate(fl.date);
-        opts.push('<option value="' + pid + "|" + fl.date + "|" + (fl.block || "") + '">' + escapeHtml(label) + "</option>");
+        if (fl.hasOrtho) { opts.push('<option value="' + base + '|ortho">' + escapeHtml(label) + " (Ortofoto)</option>"); }
+        if (fl.hasVegetation) { opts.push('<option value="' + base + '|veg">' + escapeHtml(label) + " (Vegetação)</option>"); }
       });
     });
     swipeSelectA.innerHTML = opts.join("");
@@ -535,8 +543,52 @@
 
   function flightFromSelectValue(val) {
     var parts = val.split("|");
-    var pid = parts[0], date = parts[1], block = parts[2] || null;
-    return { pid: pid, date: date, block: block, meta: findFlight(pid, date, block), name: projects[pid].name };
+    var pid = parts[0], date = parts[1], block = parts[2] || null, type = parts[3];
+    return { pid: pid, date: date, block: block, type: type, meta: findFlight(pid, date, block), name: projects[pid].name };
+  }
+
+  function swipeSideLabel(info) {
+    return info.name + (info.block ? " / " + info.block : "") + " — " + fmtDate(info.date) +
+      (info.type === "veg" ? " (Vegetação)" : " (Ortofoto)");
+  }
+
+  // Constroi a(s) layer(s) de um lado do swipe. Pane em si e' o que sera'
+  // recortado (ver setSwipePosition) -- funciona igual pra tile layer
+  // (ortofoto) ou grupos L.geoJSON (vegetacao), e vale pra qualquer camada
+  // que seja adicionada no catalogo no futuro, sem precisar de tratamento
+  // especial por tipo.
+  function buildSwipeLayers(info, paneName) {
+    if (info.type === "ortho") {
+      return Promise.resolve([
+        L.tileLayer("../data/" + info.meta.tiles + "/{z}/{x}/{y}." + info.meta.tileExt, {
+          maxZoom: 22, maxNativeZoom: info.meta.maxNativeZoom, minNativeZoom: info.meta.minNativeZoom,
+          bounds: info.meta.bounds, updateWhenZooming: false, updateWhenIdle: true, pane: paneName
+        })
+      ]);
+    }
+    return fetch("../data/" + info.meta.vegetation)
+      .then(function (r) {
+        if (!r.ok) { throw new Error("HTTP " + r.status); }
+        return r.json();
+      })
+      .then(function (fc) {
+        var byClass = {};
+        fc.features.forEach(function (feat) {
+          var cid = feat.properties.classe_id;
+          (byClass[cid] = byClass[cid] || []).push(feat);
+        });
+        return Object.keys(byClass).map(function (cidStr) {
+          var cid = Number(cidStr);
+          if (!legend[cid]) {
+            legend[cid] = { name: "Classe " + cid, color: FALLBACK_PALETTE[0], opacity: DEFAULT_OPACITY, visible: true };
+          }
+          return L.geoJSON({ type: "FeatureCollection", features: byClass[cidStr] }, {
+            pane: paneName,
+            style: styleForClass(cid),
+            onEachFeature: function (feature, layer) { layer.bindPopup(popupHtml(feature.properties)); }
+          });
+        });
+      });
   }
 
   btnSwipeToggle.addEventListener("click", function () {
@@ -548,34 +600,7 @@
     var a = flightFromSelectValue(swipeSelectA.value);
     var b = flightFromSelectValue(swipeSelectB.value);
 
-    swipeLayers.a = L.tileLayer("../data/" + a.meta.tiles + "/{z}/{x}/{y}." + a.meta.tileExt, {
-      maxZoom: 22, maxNativeZoom: a.meta.maxNativeZoom, minNativeZoom: a.meta.minNativeZoom, bounds: a.meta.bounds,
-      updateWhenZooming: false, updateWhenIdle: true, pane: "swipePane"
-    }).addTo(map);
-    swipeLayers.b = L.tileLayer("../data/" + b.meta.tiles + "/{z}/{x}/{y}." + b.meta.tileExt, {
-      maxZoom: 22, maxNativeZoom: b.meta.maxNativeZoom, minNativeZoom: b.meta.minNativeZoom, bounds: b.meta.bounds,
-      updateWhenZooming: false, updateWhenIdle: true, pane: "swipePane"
-    }).addTo(map);
-
-    // O container de uma L.TileLayer nao tem largura/altura propria (os
-    // tiles dentro dele sao posicionados individualmente) -- e' uma caixa
-    // 0x0. clip-path: inset() nao consegue recortar NADA de uma caixa de
-    // referencia 0x0 (nem em %, nem em px), entao o corte nunca aparecia.
-    // Fixamos aqui o tamanho do container do tamanho do mapa antes de
-    // aplicar qualquer clip-path.
-    if (swipeLayers.b._container) {
-      var mapSize = map.getSize();
-      swipeLayers.b._container.style.width = mapSize.x + "px";
-      swipeLayers.b._container.style.height = mapSize.y + "px";
-    }
-
-    // O Leaflet desloca o pane inteiro (translate3d) conforme o mapa e'
-    // arrastado/zoomado -- a origem local do container nao fica sempre
-    // alinhada com a borda esquerda visivel do mapa. Reaplicamos o corte
-    // sempre que o mapa se move/zooma, e sempre medindo a posicao REAL na
-    // tela (getBoundingClientRect) em vez de assumir que a origem do
-    // container coincide com a do mapa -- e' isso que causava o corte
-    // "grudado" no lugar antigo e desalinhado do divisor.
+    sizeSwipePanes();
     map.on("move zoom", onMapMoveDuringSwipe);
 
     var mapWrap = document.getElementById("mapWrap");
@@ -588,10 +613,10 @@
 
     swipeDom.labelA = document.createElement("div");
     swipeDom.labelA.className = "swipe-label left";
-    swipeDom.labelA.textContent = "A: " + a.name + (a.block ? " / " + a.block : "") + " — " + fmtDate(a.date);
+    swipeDom.labelA.textContent = "A: " + swipeSideLabel(a);
     swipeDom.labelB = document.createElement("div");
     swipeDom.labelB.className = "swipe-label right";
-    swipeDom.labelB.textContent = "B: " + b.name + (b.block ? " / " + b.block : "") + " — " + fmtDate(b.date);
+    swipeDom.labelB.textContent = "B: " + swipeSideLabel(b);
 
     mapWrap.appendChild(swipeDom.divider);
     mapWrap.appendChild(swipeDom.labelA);
@@ -604,12 +629,23 @@
     swipeActive = true;
     btnSwipeToggle.textContent = "Desativar comparação";
     btnSwipeToggle.classList.add("active");
+
+    buildSwipeLayers(a, "swipePaneA").then(function (layers) {
+      swipeLayers.a = layers;
+      if (swipeActive) { layers.forEach(function (l) { l.addTo(map); }); }
+    });
+    buildSwipeLayers(b, "swipePaneB").then(function (layers) {
+      swipeLayers.b = layers;
+      if (swipeActive) { layers.forEach(function (l) { l.addTo(map); }); }
+    });
   }
 
   function deactivateSwipe() {
     map.off("move zoom", onMapMoveDuringSwipe);
-    if (swipeLayers.a) { map.removeLayer(swipeLayers.a); swipeLayers.a = null; }
-    if (swipeLayers.b) { map.removeLayer(swipeLayers.b); swipeLayers.b = null; }
+    (swipeLayers.a || []).forEach(function (l) { map.removeLayer(l); });
+    (swipeLayers.b || []).forEach(function (l) { map.removeLayer(l); });
+    swipeLayers.a = null;
+    swipeLayers.b = null;
     ["divider", "labelA", "labelB"].forEach(function (k) {
       if (swipeDom[k] && swipeDom[k].parentNode) { swipeDom[k].parentNode.removeChild(swipeDom[k]); }
       swipeDom[k] = null;
@@ -622,37 +658,37 @@
 
   function onMapMoveDuringSwipe() { setSwipePosition(swipeCurrentPct); }
 
+  function sizeSwipePanes() {
+    var mapSize = map.getSize();
+    ["swipePaneA", "swipePaneB"].forEach(function (name) {
+      var pane = map.getPane(name);
+      if (pane) { pane.style.width = mapSize.x + "px"; pane.style.height = mapSize.y + "px"; }
+    });
+  }
+
   function setSwipePosition(pct) {
     pct = Math.max(0, Math.min(100, pct));
     swipeCurrentPct = pct;
+    if (!swipeDom.divider) { return; }
     swipeDom.divider.style.left = pct + "%";
-    if (swipeLayers.b) {
-      // L.TileLayer nao expoe um getContainer() publico (isso e do L.Map); o
-      // proprio container da tile layer fica em _container. Esse container
-      // NAO tem largura/altura propria (os tiles dentro dele sao
-      // posicionados individualmente) -- um clip-path em porcentagem fica
-      // relativo a uma caixa de 0x0 e nao corta nada visualmente. Por isso
-      // calculamos o corte em pixels absolutos a partir da largura real do
-      // mapa em vez de usar porcentagem.
-      //
-      // Alem disso, o Leaflet pode deslocar o pane do container via
-      // transform (pan/zoom) sem que a origem local dele fique alinhada com
-      // a borda visivel do mapa -- por isso medimos a posicao REAL na tela
-      // de ambos (mapa e container) com getBoundingClientRect() e calculamos
-      // o corte relativo a essa diferenca, em vez de assumir que os dois
-      // comecam no mesmo (0,0).
-      var container = swipeLayers.b._container;
-      if (container) {
-        var mapSize = map.getSize();
-        container.style.width = mapSize.x + "px";
-        container.style.height = mapSize.y + "px";
 
-        var mapRect = document.getElementById("map").getBoundingClientRect();
-        var containerRect = container.getBoundingClientRect();
-        var dividerScreenX = mapRect.left + (mapRect.width * pct / 100);
-        var xPx = Math.round(dividerScreenX - containerRect.left);
-        container.style.clipPath = "inset(0px 0px 0px " + xPx + "px)";
-      }
+    // Cortamos o PANE inteiro (nao o container interno de cada camada) --
+    // um pane e' um <div> que criamos e dimensionamos nos mesmos (ver
+    // sizeSwipePanes), entao nao tem o problema de caixa 0x0 que as tile
+    // layers tem. Funciona igual pra raster (tiles) e vetor (SVG).
+    //
+    // O Leaflet desloca o pane via transform (pan/zoom) sem que a origem
+    // local dele fique alinhada com a borda visivel do mapa -- por isso
+    // medimos a posicao REAL na tela (getBoundingClientRect) de ambos a
+    // cada chamada, em vez de assumir que os dois comecam no mesmo (0,0).
+    var paneB = map.getPane("swipePaneB");
+    if (paneB) {
+      sizeSwipePanes();
+      var mapRect = document.getElementById("map").getBoundingClientRect();
+      var paneRect = paneB.getBoundingClientRect();
+      var dividerScreenX = mapRect.left + (mapRect.width * pct / 100);
+      var xPx = Math.round(dividerScreenX - paneRect.left);
+      paneB.style.clipPath = "inset(0px 0px 0px " + xPx + "px)";
     }
   }
 
