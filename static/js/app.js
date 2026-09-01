@@ -26,6 +26,13 @@
   L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
   map.setView([0, 0], 2); // vista generica ate o catalogo carregar e ajustar
 
+  // pane dedicado com z-index alto: garante que as camadas do swipe sempre
+  // desenham por cima das camadas normais dos projetos, nao importa a ordem
+  // em que foram ligadas -- sem isso, uma camada de projeto ligada depois do
+  // swipe podia cobrir tudo e a comparacao parecia "nao fazer nada".
+  map.createPane("swipePane");
+  map.getPane("swipePane").style.zIndex = 650;
+
   // Em areas rurais o Esri World Imagery costuma nao ter imagem em zooms muito
   // altos e devolve um tile placeholder ("Map data not yet available") em vez
   // de erro. maxNativeZoom trava as requisicoes nesse teto e deixa o Leaflet
@@ -500,11 +507,11 @@
 
     swipeLayers.a = L.tileLayer("../data/" + a.meta.tiles + "/{z}/{x}/{y}." + a.meta.tileExt, {
       maxZoom: 22, maxNativeZoom: a.meta.maxNativeZoom, minNativeZoom: a.meta.minNativeZoom, bounds: a.meta.bounds,
-      updateWhenZooming: false, updateWhenIdle: true
+      updateWhenZooming: false, updateWhenIdle: true, pane: "swipePane"
     }).addTo(map);
     swipeLayers.b = L.tileLayer("../data/" + b.meta.tiles + "/{z}/{x}/{y}." + b.meta.tileExt, {
       maxZoom: 22, maxNativeZoom: b.meta.maxNativeZoom, minNativeZoom: b.meta.minNativeZoom, bounds: b.meta.bounds,
-      updateWhenZooming: false, updateWhenIdle: true
+      updateWhenZooming: false, updateWhenIdle: true, pane: "swipePane"
     }).addTo(map);
 
     var mapWrap = document.getElementById("mapWrap");

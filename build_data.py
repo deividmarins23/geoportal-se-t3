@@ -391,6 +391,66 @@ def list_all_flights():
     return items
 
 
+def rename_project_display_name(project_slug, new_name):
+    """
+    Corrige o NOME DE EXIBICAO de um projeto (o identificador interno/slug
+    nunca muda) em todos os itens que pertencem a ele.
+    """
+    count = 0
+    for meta_path in glob.glob(os.path.join(DATA_DIR, project_slug, "*", "meta.json")):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        meta["projectName"] = new_name
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+        count += 1
+    log(f"Nome de exibicao do projeto '{project_slug}' -> '{new_name}' ({count} item(ns))")
+    return count
+
+
+def edit_flight(project, date, block, new_project_name, new_date, new_block):
+    """
+    Corrige metadados de um item ja processado (nome de exibicao do projeto,
+    data do voo, bloco), SEM reprocessar ortofoto/vegetacao. O slug do projeto
+    (identidade interna) nunca muda -- so o texto de exibicao, se informado.
+
+    new_date e new_block sao sempre o valor final desejado (o chamador -- a
+    interface grafica -- ja pre-preenche com o valor atual, entao aqui nao ha
+    ambiguidade entre "nao informado" e "limpo de proposito").
+    Retorna a nova pasta do item (pode ser a mesma, se data/bloco nao mudaram).
+    """
+    out_dir = flight_dir(project, date, block)
+    meta_path = os.path.join(out_dir, "meta.json")
+    if not os.path.exists(meta_path):
+        raise FileNotFoundError(f"item nao encontrado: {out_dir}")
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+
+    project_slug = meta["project"]
+
+    final_date = (new_date or "").strip() or date
+    final_block = (new_block or "").strip() or None
+
+    new_dir = flight_dir(project_slug, final_date, final_block)
+    if new_dir != out_dir:
+        if os.path.exists(new_dir):
+            raise ValueError(f"já existe um item em {os.path.basename(new_dir)} -- escolha outra data/bloco")
+        os.makedirs(os.path.dirname(new_dir), exist_ok=True)
+        shutil.move(out_dir, new_dir)
+        out_dir = new_dir
+        meta_path = os.path.join(out_dir, "meta.json")
+        meta["date"] = final_date
+        meta["block"] = final_block
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+        log(f"item movido para {out_dir}")
+
+    if new_project_name and new_project_name.strip() and new_project_name.strip() != meta.get("projectName"):
+        rename_project_display_name(project_slug, new_project_name.strip())
+
+    return out_dir
+
+
 def rebuild_catalog():
     log("Reconstruindo catalog.json ...")
     projects = {}  # id -> {"id","name","flights":[...]}

@@ -91,6 +91,7 @@ class App(tk.Tk):
             side="left", padx=(8, 0))
         ttk.Separator(btn_row, orient="vertical").pack(side="left", fill="y", padx=8)
         ttk.Label(btn_row, text="No item selecionado acima:", style="Sub.TLabel").pack(side="left")
+        ttk.Button(btn_row, text="Editar...", command=self._edit_selected).pack(side="left", padx=(6, 0))
         ttk.Button(btn_row, text="Mostrar", command=lambda: self._change_status("visible")).pack(
             side="left", padx=(6, 0))
         ttk.Button(btn_row, text="Ocultar", command=lambda: self._change_status("hidden")).pack(
@@ -111,6 +112,9 @@ class App(tk.Tk):
         self.project_combo.bind("<<ComboboxSelected>>", self._update_slug_hint)
         self.slug_hint = ttk.Label(form, text="", style="Sub.TLabel")
         self.slug_hint.grid(row=r, column=2, sticky="w", padx=(8, 0))
+        r += 1
+        ttk.Label(form, text="escolha um projeto já existente na lista, ou digite um nome novo pra criar um",
+                   style="Sub.TLabel").grid(row=r, column=1, columnspan=2, sticky="w")
         r += 1
 
         ttk.Label(form, text="Bloco/subcampo (opcional):").grid(row=r, column=0, sticky="w", pady=3)
@@ -145,13 +149,6 @@ class App(tk.Tk):
         ttk.Entry(tif_row, textvariable=self.tif_path_var, state="readonly").grid(row=0, column=0, sticky="ew")
         ttk.Button(tif_row, text="Procurar...", command=self._pick_tif).grid(row=0, column=1, padx=(6, 0))
         ttk.Button(tif_row, text="Limpar", command=lambda: self.tif_path_var.set("")).grid(row=0, column=2, padx=(6, 0))
-        r += 1
-
-        ttk.Label(form, text="Nome de exibição (opcional):").grid(row=r, column=0, sticky="w", pady=3)
-        self.project_name_var = tk.StringVar()
-        ttk.Entry(form, textvariable=self.project_name_var).grid(row=r, column=1, sticky="ew", pady=3)
-        ttk.Label(form, text="se vazio, usa o mesmo texto do campo Projeto", style="Sub.TLabel").grid(
-            row=r, column=2, sticky="w", padx=(8, 0))
         r += 1
 
         self.autopublish_var = tk.BooleanVar(value=True)
@@ -228,6 +225,73 @@ class App(tk.Tk):
             return None
         return self._row_key.get(sel[0])
 
+    def _find_meta(self, project, date, block):
+        for m in getattr(self, "_flights_cache", []):
+            if m.get("project") == project and m.get("date") == date and (m.get("block") or None) == (block or None):
+                return m
+        return None
+
+    def _edit_selected(self):
+        if self.busy:
+            return
+        key = self._selected_key()
+        if not key:
+            return
+        project, date, block = key
+        meta = self._find_meta(project, date, block)
+        if not meta:
+            messagebox.showerror("Erro", "Não encontrei os dados desse item -- clique em \"Atualizar lista\" e tente de novo.")
+            return
+
+        dlg = tk.Toplevel(self)
+        dlg.title("Editar item")
+        dlg.transient(self)
+        dlg.grab_set()
+        pad = ttk.Frame(dlg, padding=12)
+        pad.grid(sticky="nsew")
+        pad.columnconfigure(1, weight=1)
+
+        ttk.Label(pad, text="Identificador interno (não muda): " + project, style="Sub.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+
+        ttk.Label(pad, text="Nome de exibição do projeto:").grid(row=1, column=0, sticky="w", pady=3)
+        name_var = tk.StringVar(value=meta.get("projectName", ""))
+        ttk.Entry(pad, textvariable=name_var, width=30).grid(row=1, column=1, sticky="ew", pady=3)
+
+        ttk.Label(pad, text="(vale pra todos os itens desse projeto)", style="Sub.TLabel").grid(
+            row=2, column=1, sticky="w")
+
+        ttk.Label(pad, text="Bloco/subcampo:").grid(row=3, column=0, sticky="w", pady=3)
+        block_var = tk.StringVar(value=block or "")
+        ttk.Entry(pad, textvariable=block_var, width=30).grid(row=3, column=1, sticky="ew", pady=3)
+
+        ttk.Label(pad, text="Data do voo (AAAA-MM-DD):").grid(row=4, column=0, sticky="w", pady=3)
+        date_var = tk.StringVar(value=date)
+        ttk.Entry(pad, textvariable=date_var, width=16).grid(row=4, column=1, sticky="w", pady=3)
+
+        btns = ttk.Frame(pad)
+        btns.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
+
+        def on_save():
+            new_date = date_var.get().strip()
+            if not DATE_RE.match(new_date):
+                messagebox.showwarning("Data inválida", "A data deve estar no formato AAAA-MM-DD.", parent=dlg)
+                return
+            try:
+                bd.edit_flight(project, date, block,
+                                new_project_name=name_var.get(), new_date=new_date, new_block=block_var.get())
+                bd.rebuild_catalog()
+            except Exception as e:
+                messagebox.showerror("Erro ao salvar", str(e), parent=dlg)
+                return
+            dlg.destroy()
+            self._refresh_catalog()
+            if self.autopublish_var.get():
+                self._on_publish_clicked()
+
+        ttk.Button(btns, text="Cancelar", command=dlg.destroy).pack(side="right")
+        ttk.Button(btns, text="Salvar", style="Primary.TButton", command=on_save).pack(side="right", padx=(0, 8))
+
     def _change_status(self, status):
         if self.busy:
             return
@@ -301,7 +365,18 @@ class App(tk.Tk):
         date_str = self.date_var.get().strip()
         veg = self.veg_path_var.get().strip() or None
         tif = self.tif_path_var.get().strip() or None
-        display_name = self.project_name_var.get().strip() or project_name
+
+        # o nome de exibicao de um projeto e' fixado na criacao e nao muda so
+        # por ter digitado o campo Projeto de um jeito ligeiramente diferente
+        # depois -- se o slug ja existe, reusa o nome de exibicao que ja tem
+        # (corrigir o nome de verdade e' feito pelo botao "Editar...")
+        existing_display_name = None
+        slug = bd.slugify(project_name) if project_name else None
+        for m in getattr(self, "_flights_cache", []):
+            if m.get("project") == slug:
+                existing_display_name = m.get("projectName")
+                break
+        display_name = existing_display_name or project_name
 
         if not project_name:
             messagebox.showwarning("Campo obrigatório", "Informe o nome do projeto.")
