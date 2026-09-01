@@ -1,0 +1,23 @@
+{
+  "project": "solar-lavras",
+  "projectName": "PCS09_PRELPZ",
+  "date": "2026-08-03",
+  "block": "PC09",
+  "status": "visible",
+  "bounds": [
+    [
+      -3.80145193173,
+      -38.931572
+    ],
+    [
+      -3.796224,
+      -38.9273834473
+    ]
+  ],
+  "hasOrtho": true,
+  "hasVegetation": false,
+  "tileExt": "webp",
+  "minNativeZoom": 15,
+  "maxNativeZoom": 21,
+  "classes": []
+}
