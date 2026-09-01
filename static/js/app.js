@@ -554,6 +554,18 @@
       updateWhenZooming: false, updateWhenIdle: true, pane: "swipePane"
     }).addTo(map);
 
+    // O container de uma L.TileLayer nao tem largura/altura propria (os
+    // tiles dentro dele sao posicionados individualmente) -- e' uma caixa
+    // 0x0. clip-path: inset() nao consegue recortar NADA de uma caixa de
+    // referencia 0x0 (nem em %, nem em px), entao o corte nunca aparecia.
+    // Fixamos aqui o tamanho do container do tamanho do mapa antes de
+    // aplicar qualquer clip-path.
+    if (swipeLayers.b._container) {
+      var mapSize = map.getSize();
+      swipeLayers.b._container.style.width = mapSize.x + "px";
+      swipeLayers.b._container.style.height = mapSize.y + "px";
+    }
+
     var mapWrap = document.getElementById("mapWrap");
     swipeDom.divider = document.createElement("div");
     swipeDom.divider.className = "swipe-divider";
@@ -599,9 +611,20 @@
     swipeDom.divider.style.left = pct + "%";
     if (swipeLayers.b) {
       // L.TileLayer nao expoe um getContainer() publico (isso e do L.Map); o
-      // proprio container da tile layer fica em _container.
+      // proprio container da tile layer fica em _container. Esse container
+      // NAO tem largura/altura propria (os tiles dentro dele sao
+      // posicionados individualmente) -- um clip-path em porcentagem fica
+      // relativo a uma caixa de 0x0 e nao corta nada visualmente. Por isso
+      // calculamos o corte em pixels absolutos a partir da largura real do
+      // mapa em vez de usar porcentagem.
       var container = swipeLayers.b._container;
-      if (container) { container.style.clipPath = "inset(0 0 0 " + pct + "%)"; }
+      if (container) {
+        var mapSize = map.getSize();
+        container.style.width = mapSize.x + "px";
+        container.style.height = mapSize.y + "px";
+        var xPx = Math.round(mapSize.x * pct / 100);
+        container.style.clipPath = "inset(0px 0px 0px " + xPx + "px)";
+      }
     }
   }
 
