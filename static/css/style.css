@@ -229,8 +229,21 @@ html, body {
 
 .blocks-grid {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
+}
+.block-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.block-date-select {
+  font-size: 11.5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 5px;
+  background: #fff;
+  color: var(--text-muted);
 }
 .block-chip {
   border: 1px solid var(--border);

@@ -76,6 +76,7 @@
   var vegByFlight = {};     // flightKey -> { classId: L.geoJSON }
   var vegDataPromiseByFlight = {};
   var activeFlights = {};   // flightKey -> true
+  var blockSelectedDate = {}; // "pid::block" -> data escolhida (default: mais recente)
 
   var projectSelect = document.getElementById("projectSelect");
   var projectPanelBody = document.getElementById("projectPanelBody");
@@ -96,6 +97,19 @@
   function latestFlightForBlock(pid, block) {
     var fls = projects[pid].flights.filter(function (f) { return (f.block || null) === (block || null); });
     return fls[0] || null; // catalog.json ja vem ordenado por data desc
+  }
+
+  function datesForBlock(pid, block) {
+    return projects[pid].flights
+      .filter(function (f) { return (f.block || null) === (block || null); })
+      .map(function (f) { return f.date; }); // ja vem ordenado desc
+  }
+
+  function selectedDateForBlock(pid, block) {
+    var key = pid + "::" + block;
+    if (blockSelectedDate[key]) { return blockSelectedDate[key]; }
+    var dates = datesForBlock(pid, block);
+    return dates[0]; // sem preferencia salva: usa a mais recente
   }
 
   // ------------------------------------------------------------------
@@ -365,48 +379,74 @@
   }
 
   function renderBlocksPanel(proj) {
-    var chips = proj.blocks.map(function (block) {
-      var fl = latestFlightForBlock(proj.id, block);
-      var key = flightKey(proj.id, fl.date, block);
-      var active = !!activeFlights[key];
+    var rows = proj.blocks.map(function (block) {
+      var dates = datesForBlock(proj.id, block);
+      var selDate = selectedDateForBlock(proj.id, block);
+      var active = !!activeFlights[flightKey(proj.id, selDate, block)];
+
+      var dateSelect = "";
+      if (dates.length > 1) {
+        var opts = dates.map(function (d) {
+          return '<option value="' + d + '"' + (d === selDate ? " selected" : "") + ">" + fmtDate(d) + "</option>";
+        }).join("");
+        dateSelect = '<select class="block-date-select" data-block="' + escapeHtml(block) + '">' + opts + "</select>";
+      }
+
       return (
-        '<button type="button" class="block-chip' + (active ? " active" : "") + '" ' +
-          'data-block="' + escapeHtml(block) + '" title="' + fmtDate(fl.date) + '">' +
-          escapeHtml(block) +
-        "</button>"
+        '<div class="block-row">' +
+          '<button type="button" class="block-chip' + (active ? " active" : "") + '" ' +
+            'data-block="' + escapeHtml(block) + '" title="' + fmtDate(selDate) + '">' +
+            escapeHtml(block) +
+          "</button>" +
+          dateSelect +
+        "</div>"
       );
     }).join("");
 
-    var anyActive = proj.blocks.some(function (block) {
-      var fl = latestFlightForBlock(proj.id, block);
-      return !!activeFlights[flightKey(proj.id, fl.date, block)];
-    });
-
     projectPanelBody.innerHTML =
       '<div class="blocks-head">' +
-        '<label class="select-all-row"><input type="checkbox" id="blocksSelectAll" ' + (anyActive ? "checked" : "") + '> Selecionar todos</label>' +
+        '<label class="select-all-row"><input type="checkbox" id="blocksSelectAll" ' +
+          (countActiveBlocks(proj) === proj.blocks.length ? "checked" : "") + '> Selecionar todos</label>' +
         '<span class="blocks-count" id="blocksCount">' + countActiveBlocks(proj) + " selecionado(s)</span>" +
       "</div>" +
-      '<div class="blocks-grid" id="blocksGrid">' + chips + "</div>";
+      '<div class="blocks-grid" id="blocksGrid">' + rows + "</div>";
 
-    document.getElementById("blocksGrid").addEventListener("click", function (e) {
+    var grid = document.getElementById("blocksGrid");
+
+    grid.addEventListener("click", function (e) {
       var btn = e.target.closest(".block-chip");
       if (!btn) { return; }
       var block = btn.getAttribute("data-block");
-      var fl = latestFlightForBlock(proj.id, block);
-      var key = flightKey(proj.id, fl.date, block);
-      var nowActive = !activeFlights[key];
-      setFlightActive(proj.id, fl.date, block, nowActive);
+      var date = selectedDateForBlock(proj.id, block);
+      var nowActive = !activeFlights[flightKey(proj.id, date, block)];
+      setFlightActive(proj.id, date, block, nowActive);
       btn.classList.toggle("active", nowActive);
       document.getElementById("blocksCount").textContent = countActiveBlocks(proj) + " selecionado(s)";
       document.getElementById("blocksSelectAll").checked = countActiveBlocks(proj) === proj.blocks.length;
     });
 
+    grid.addEventListener("change", function (e) {
+      var sel = e.target.closest(".block-date-select");
+      if (!sel) { return; }
+      var block = sel.getAttribute("data-block");
+      var oldDate = selectedDateForBlock(proj.id, block);
+      var newDate = sel.value;
+      var wasActive = !!activeFlights[flightKey(proj.id, oldDate, block)];
+
+      blockSelectedDate[proj.id + "::" + block] = newDate;
+      if (wasActive) {
+        setFlightActive(proj.id, oldDate, block, false);
+        setFlightActive(proj.id, newDate, block, true);
+      }
+      var btn = sel.parentElement.querySelector(".block-chip");
+      if (btn) { btn.title = fmtDate(newDate); }
+    });
+
     document.getElementById("blocksSelectAll").addEventListener("change", function () {
       var turnOn = this.checked;
       proj.blocks.forEach(function (block) {
-        var fl = latestFlightForBlock(proj.id, block);
-        setFlightActive(proj.id, fl.date, block, turnOn);
+        var date = selectedDateForBlock(proj.id, block);
+        setFlightActive(proj.id, date, block, turnOn);
       });
       renderBlocksPanel(proj); // re-renderiza os chips com o novo estado
     });
@@ -414,8 +454,8 @@
 
   function countActiveBlocks(proj) {
     return proj.blocks.filter(function (block) {
-      var fl = latestFlightForBlock(proj.id, block);
-      return !!activeFlights[flightKey(proj.id, fl.date, block)];
+      var date = selectedDateForBlock(proj.id, block);
+      return !!activeFlights[flightKey(proj.id, date, block)];
     }).length;
   }
 
