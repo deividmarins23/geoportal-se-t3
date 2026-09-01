@@ -159,6 +159,7 @@
     });
 
     if (legendOrder.length === 0) { legendPanel.hidden = true; return; }
+    legendPanel.hidden = false;
     legendList.innerHTML = legendOrder.map(buildLegendRowHtml).join("");
   }
 
