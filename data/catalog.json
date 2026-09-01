@@ -6,6 +6,7 @@
       "flights": [
         {
           "date": "2026-08-03",
+          "block": null,
           "bounds": [
             [
               -3.7922032250649997,
@@ -16,6 +17,8 @@
               -38.926831922559
             ]
           ],
+          "hasOrtho": true,
+          "hasVegetation": true,
           "tiles": "se-t3/2026-08-03/tiles",
           "tileExt": "webp",
           "minNativeZoom": 15,

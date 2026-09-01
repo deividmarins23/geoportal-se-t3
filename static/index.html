@@ -32,15 +32,21 @@
     </section>
 
     <section class="panel">
-      <div class="panel-header-row">
-        <h3>Projetos</h3>
-        <button id="btnResetColors" class="link-btn">restaurar cores</button>
-      </div>
-      <div id="projectList"></div>
+      <h3>Projeto</h3>
+      <select id="projectSelect" class="project-select"></select>
+      <div id="projectPanelBody"></div>
       <div class="panel-footer" id="catalogStatus">Carregando catálogo...</div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="legendPanel" hidden>
+      <div class="panel-header-row">
+        <h3>Legenda de Vegetação</h3>
+        <button id="btnResetColors" class="link-btn">restaurar cores</button>
+      </div>
+      <div id="legendList"></div>
+    </section>
+
+    <section class="panel" id="swipePanel" hidden>
       <h3>Comparar Ortofotos (Swipe)</h3>
       <div class="swipe-row">
         <label for="swipeA">Camada A</label>
