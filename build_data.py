@@ -200,7 +200,11 @@ def build_raster(src_tif, out_dir):
     with rasterio.open(src_tif) as src:
         bounds_4326 = tuple(src.bounds)  # (left, bottom, right, top), ja em EPSG:4326
 
-        with WarpedVRT(src, crs="EPSG:3857", resampling=Resampling.bilinear) as vrt:
+        # "average" (media de area) em vez de "bilinear": bilinear so olha 4
+        # pixels vizinhos, o que causa aliasing/moire forte ao reduzir
+        # resolucao de texturas finas e regulares (ex: fileiras de paineis
+        # solares) -- "average" faz uma media de area de verdade e evita isso.
+        with WarpedVRT(src, crs="EPSG:3857", resampling=Resampling.average) as vrt:
             left, bottom, right, top = vrt.bounds
             log(f"Bounds (EPSG:3857): {left:.1f}, {bottom:.1f}, {right:.1f}, {top:.1f}")
 
@@ -222,7 +226,7 @@ def build_raster(src_tif, out_dir):
                             data = vrt.read(
                                 out_shape=(vrt.count, TILE_SIZE, TILE_SIZE),
                                 window=window,
-                                resampling=Resampling.bilinear,
+                                resampling=Resampling.average,
                             )
                         except Exception:
                             continue
