@@ -31,6 +31,7 @@ import json
 import math
 import os
 import re
+import shutil
 import time
 
 import numpy as np
@@ -266,13 +267,14 @@ def build_raster(src_tif, out_dir):
 # 3. meta.json por item + catalog.json agregado
 # ----------------------------------------------------------------------
 def write_flight_meta(out_dir, project, project_name, date, block, bounds_4326,
-                       has_ortho, has_vegetation, classes):
+                       has_ortho, has_vegetation, classes, status="visible"):
     left, bottom, right, top = bounds_4326
     meta = {
         "project": project,
         "projectName": project_name,
         "date": date,
         "block": block,  # None para projetos sem subdivisao em blocos/subcampos
+        "status": status,  # "visible" (aparece no site publicado) ou "hidden" (fica no repo mas some do catalogo publico)
         "bounds": [[bottom, left], [top, right]],  # [[south, west], [north, east]]
         "hasOrtho": has_ortho,
         "hasVegetation": has_vegetation,
@@ -304,28 +306,29 @@ def process_flight(project, project_name, date, block=None,
     label = project_name + (f" / {block}" if block else "") + f" ({date})"
     log(f"=== Processando {label} -> {out_dir} ===")
 
-    classes = []
-    veg_bounds = None
-    has_vegetation = bool(src_geojson)
-    if has_vegetation and not skip_vector:
-        classes, veg_bounds = build_vector(src_geojson, out_dir)
-    elif has_vegetation:
-        meta_path = os.path.join(out_dir, "meta.json")
-        if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                old = json.load(f)
-            classes = old.get("classes", [])
+    # le o meta.json anterior (se existir) uma unica vez -- serve de "memoria"
+    # pra nao perder vegetacao/ortofoto/status ja gravados quando esta chamada
+    # so esta atualizando UMA das duas partes (ex: reprocessar so a ortofoto
+    # nao pode apagar a vegetacao que ja estava la)
+    existing = None
+    meta_path = os.path.join(out_dir, "meta.json")
+    if os.path.exists(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
 
-    has_ortho = bool(src_tif)
+    classes = existing.get("classes", []) if existing else []
+    veg_bounds = None
+    has_vegetation = bool(src_geojson) or bool(existing and existing.get("hasVegetation"))
+    if src_geojson and not skip_vector:
+        classes, veg_bounds = build_vector(src_geojson, out_dir)
+
     ortho_bounds = None
-    if has_ortho and not skip_raster:
+    has_ortho = bool(src_tif) or bool(existing and existing.get("hasOrtho"))
+    if src_tif and not skip_raster:
         ortho_bounds = build_raster(src_tif, out_dir)
-    elif has_ortho:
-        meta_path = os.path.join(out_dir, "meta.json")
-        if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                b = json.load(f)["bounds"]
-            ortho_bounds = (b[0][1], b[0][0], b[1][1], b[1][0])
+    elif has_ortho and existing:
+        b = existing["bounds"]
+        ortho_bounds = (b[0][1], b[0][0], b[1][1], b[1][0])
 
     # prioriza os bounds da ortofoto (mais precisos/maiores em geral); cai pra
     # vegetacao se nao houver ortofoto neste item
@@ -333,15 +336,65 @@ def process_flight(project, project_name, date, block=None,
     if bounds_4326 is None:
         raise ValueError(f"nao foi possivel determinar bounds para {label}")
 
+    # reprocessar um item ja existente nao deve tirar ele do estado
+    # oculto/visivel que ja tinha -- so quem mexe nisso e set_status()
+    status = existing.get("status", "visible") if existing else "visible"
+
     write_flight_meta(out_dir, project_slug, project_name, date, block,
-                       bounds_4326, has_ortho, has_vegetation, classes)
+                       bounds_4326, has_ortho, has_vegetation, classes, status)
     log(f"=== OK: {label} ===")
     return out_dir
+
+
+def set_status(project, date, block, status):
+    """status: 'visible' ou 'hidden'. Nao mexe nos arquivos, so na flag."""
+    if status not in ("visible", "hidden"):
+        raise ValueError("status precisa ser 'visible' ou 'hidden'")
+    out_dir = flight_dir(project, date, block)
+    meta_path = os.path.join(out_dir, "meta.json")
+    if not os.path.exists(meta_path):
+        raise FileNotFoundError(f"item nao encontrado: {out_dir}")
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    meta["status"] = status
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)
+    log(f"status de {out_dir} -> {status}")
+
+
+def delete_flight(project, date, block):
+    """Apaga a pasta do item por completo (tiles + geojson + meta.json)."""
+    out_dir = flight_dir(project, date, block)
+    if not os.path.isdir(out_dir):
+        raise FileNotFoundError(f"item nao encontrado: {out_dir}")
+    shutil.rmtree(out_dir)
+    log(f"apagado: {out_dir}")
+
+    # se era o ultimo item do projeto, remove a pasta do projeto tambem
+    project_dir = os.path.dirname(out_dir)
+    if os.path.isdir(project_dir) and not os.listdir(project_dir):
+        os.rmdir(project_dir)
+
+
+def list_all_flights():
+    """
+    Varre TODOS os meta.json (visiveis e ocultos) -- usado pela interface
+    grafica pra mostrar tudo, inclusive o que esta oculto do site publico.
+    rebuild_catalog() filtra os ocultos; essa funcao nao filtra nada.
+    """
+    items = []
+    for meta_path in sorted(glob.glob(os.path.join(DATA_DIR, "*", "*", "meta.json"))):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        items.append(meta)
+    items.sort(key=lambda m: (m.get("projectName", ""), m.get("date", ""), m.get("block") or ""), reverse=False)
+    return items
 
 
 def rebuild_catalog():
     log("Reconstruindo catalog.json ...")
     projects = {}  # id -> {"id","name","flights":[...]}
+    n_hidden = 0
 
     for meta_path in sorted(glob.glob(os.path.join(DATA_DIR, "*", "*", "meta.json"))):
         flight_folder = os.path.dirname(meta_path)
@@ -350,6 +403,10 @@ def rebuild_catalog():
 
         with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
+
+        if meta.get("status", "visible") == "hidden":
+            n_hidden += 1
+            continue  # oculto: nao entra no catalog.json publico
 
         pid = meta.get("project", project_folder)
         pname = meta.get("projectName", pid)
@@ -395,7 +452,8 @@ def rebuild_catalog():
         json.dump(catalog, f, indent=2, ensure_ascii=False)
 
     n_flights = sum(len(p["flights"]) for p in project_list)
-    log(f"Catalogo: {len(project_list)} projeto(s), {n_flights} item(ns) -> {CATALOG_PATH}")
+    hidden_note = f" ({n_hidden} oculto(s), nao incluido(s))" if n_hidden else ""
+    log(f"Catalogo: {len(project_list)} projeto(s), {n_flights} item(ns) -> {CATALOG_PATH}{hidden_note}")
 
 
 def main():

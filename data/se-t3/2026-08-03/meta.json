@@ -2,6 +2,8 @@
   "project": "se-t3",
   "projectName": "SE-T3",
   "date": "2026-08-03",
+  "block": null,
+  "status": "visible",
   "bounds": [
     [
       -3.7922032250649997,
@@ -12,6 +14,8 @@
       -38.926831922559
     ]
   ],
+  "hasOrtho": true,
+  "hasVegetation": true,
   "tileExt": "webp",
   "minNativeZoom": 15,
   "maxNativeZoom": 21,

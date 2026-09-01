@@ -71,22 +71,31 @@ class App(tk.Tk):
         cat_frame.columnconfigure(0, weight=1)
         cat_frame.rowconfigure(0, weight=1)
 
-        cols = ("projeto", "bloco", "data", "ortofoto", "vegetacao")
+        cols = ("projeto", "bloco", "data", "ortofoto", "vegetacao", "status")
         self.tree = ttk.Treeview(cat_frame, columns=cols, show="headings", height=8)
-        for c, w, t in [("projeto", 160, "Projeto"), ("bloco", 110, "Bloco"), ("data", 90, "Data"),
-                         ("ortofoto", 80, "Ortofoto"), ("vegetacao", 90, "Vegetação")]:
+        for c, w, t in [("projeto", 150, "Projeto"), ("bloco", 90, "Bloco"), ("data", 90, "Data"),
+                         ("ortofoto", 70, "Ortofoto"), ("vegetacao", 80, "Vegetação"), ("status", 90, "Status")]:
             self.tree.heading(c, text=t)
             self.tree.column(c, width=w, anchor="w")
+        self.tree.tag_configure("hidden", foreground="#999999")
         self.tree.grid(row=0, column=0, sticky="nsew")
         sb = ttk.Scrollbar(cat_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         sb.grid(row=0, column=1, sticky="ns")
+        self._row_key = {}  # tree iid -> (project_slug, date, block)
 
         btn_row = ttk.Frame(cat_frame)
         btn_row.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
         ttk.Button(btn_row, text="Atualizar lista", command=self._refresh_catalog).pack(side="left")
         ttk.Button(btn_row, text="Abrir geoportal local", command=self._open_local_geoportal).pack(
             side="left", padx=(8, 0))
+        ttk.Separator(btn_row, orient="vertical").pack(side="left", fill="y", padx=8)
+        ttk.Label(btn_row, text="No item selecionado acima:", style="Sub.TLabel").pack(side="left")
+        ttk.Button(btn_row, text="Mostrar", command=lambda: self._change_status("visible")).pack(
+            side="left", padx=(6, 0))
+        ttk.Button(btn_row, text="Ocultar", command=lambda: self._change_status("hidden")).pack(
+            side="left", padx=(6, 0))
+        ttk.Button(btn_row, text="Excluir...", command=self._delete_selected).pack(side="left", padx=(6, 0))
 
         # --- Formulario de novo item --------------------------------------
         form = ttk.LabelFrame(root, text="Adicionar novo item (projeto + data + bloco opcional)", padding=10)
@@ -174,26 +183,25 @@ class App(tk.Tk):
     # ------------------------------------------------------------------
     # Catalogo
     # ------------------------------------------------------------------
-    def _load_catalog(self):
-        if not os.path.exists(bd.CATALOG_PATH):
-            return {"projects": []}
-        with open(bd.CATALOG_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-
     def _refresh_catalog(self):
-        catalog = self._load_catalog()
+        items = bd.list_all_flights()  # inclui ocultos -- so a UI ve isso, o site nao
         self.tree.delete(*self.tree.get_children())
+        self._row_key = {}
         names = []
-        for p in catalog.get("projects", []):
-            names.append(p["name"])
-            for fl in p.get("flights", []):
-                self.tree.insert("", "end", values=(
-                    p["name"], fl.get("block") or "—", fl.get("date", ""),
-                    "sim" if fl.get("hasOrtho") else "não",
-                    "sim" if fl.get("hasVegetation") else "não",
-                ))
+        for m in items:
+            pname = m.get("projectName", m.get("project", ""))
+            if pname not in names:
+                names.append(pname)
+            status = m.get("status", "visible")
+            iid = self.tree.insert("", "end", values=(
+                pname, m.get("block") or "—", m.get("date", ""),
+                "sim" if m.get("hasOrtho") else "não",
+                "sim" if m.get("hasVegetation") else "não",
+                "Oculto" if status == "hidden" else "Visível",
+            ), tags=("hidden",) if status == "hidden" else ())
+            self._row_key[iid] = (m.get("project"), m.get("date"), m.get("block"))
         self.project_combo["values"] = names
-        self._catalog_cache = catalog
+        self._flights_cache = items
 
     def _update_slug_hint(self, _event=None):
         name = self.project_var.get().strip()
@@ -205,10 +213,64 @@ class App(tk.Tk):
     def _project_blocks_mode(self, project_name):
         """True se o projeto ja existente usa blocos, False se usa datas simples, None se e novo."""
         slug = bd.slugify(project_name)
-        for p in self._catalog_cache.get("projects", []):
-            if p["id"] == slug:
-                return any(fl.get("block") for fl in p.get("flights", []))
-        return None
+        matches = [m for m in getattr(self, "_flights_cache", []) if m.get("project") == slug]
+        if not matches:
+            return None
+        return any(m.get("block") for m in matches)
+
+    # ------------------------------------------------------------------
+    # Mostrar / Ocultar / Excluir item selecionado
+    # ------------------------------------------------------------------
+    def _selected_key(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo("Nenhum item selecionado", "Selecione um item na lista acima primeiro.")
+            return None
+        return self._row_key.get(sel[0])
+
+    def _change_status(self, status):
+        if self.busy:
+            return
+        key = self._selected_key()
+        if not key:
+            return
+        project, date, block = key
+        try:
+            bd.set_status(project, date, block, status)
+            bd.rebuild_catalog()
+        except Exception as e:
+            messagebox.showerror("Erro", "Não foi possível mudar o status: " + str(e))
+            return
+        self._refresh_catalog()
+        if self.autopublish_var.get():
+            self._on_publish_clicked()
+
+    def _delete_selected(self):
+        if self.busy:
+            return
+        key = self._selected_key()
+        if not key:
+            return
+        project, date, block = key
+        label = project + (f" / {block}" if block else "") + f" ({date})"
+        if not messagebox.askyesno(
+            "Excluir item",
+            "Isso apaga PERMANENTEMENTE a ortofoto e a vegetação de:\n\n{}\n\n"
+            "Os arquivos são removidos do computador. Se você já publicou antes, "
+            "eles continuam existindo no histórico do Git, mas somem da próxima "
+            "publicação em diante.\n\nTem certeza?".format(label)
+        ):
+            return
+        try:
+            bd.delete_flight(project, date, block)
+            bd.rebuild_catalog()
+        except Exception as e:
+            messagebox.showerror("Erro", "Não foi possível excluir: " + str(e))
+            return
+        self._refresh_catalog()
+        messagebox.showinfo("Excluído", "Item removido.")
+        if self.autopublish_var.get():
+            self._on_publish_clicked()
 
     # ------------------------------------------------------------------
     # Selecao de arquivos
