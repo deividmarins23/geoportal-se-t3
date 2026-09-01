@@ -58,6 +58,32 @@
           ]
         }
       ]
+    },
+    {
+      "id": "solar-lavras",
+      "name": "PCS09_ANTES DA LIMPEZA",
+      "flights": [
+        {
+          "date": "2026-08-03",
+          "block": "PCS9",
+          "bounds": [
+            [
+              -3.80145193173,
+              -38.931572
+            ],
+            [
+              -3.796224,
+              -38.9273834473
+            ]
+          ],
+          "hasOrtho": true,
+          "hasVegetation": false,
+          "tiles": "solar-lavras/2026-08-03--pcs9/tiles",
+          "tileExt": "webp",
+          "minNativeZoom": 15,
+          "maxNativeZoom": 21
+        }
+      ]
     }
   ]
 }
