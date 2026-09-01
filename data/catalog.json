@@ -85,7 +85,7 @@
         },
         {
           "date": "2026-08-03",
-          "block": "PC09",
+          "block": "PCS09",
           "bounds": [
             [
               -3.80145193173,
@@ -98,7 +98,7 @@
           ],
           "hasOrtho": true,
           "hasVegetation": false,
-          "tiles": "solar-lavras/2026-08-03--pc09/tiles",
+          "tiles": "solar-lavras/2026-08-03--pcs09/tiles",
           "tileExt": "webp",
           "minNativeZoom": 15,
           "maxNativeZoom": 21
